@@ -1,0 +1,5 @@
+*.jpg
+出錯誤.txt
+processed_images
+hysteroscopy_dataset
+padded_images
