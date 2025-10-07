@@ -3,3 +3,4 @@
 processed_images
 hysteroscopy_dataset
 padded_images
+.pt
