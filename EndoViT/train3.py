@@ -85,7 +85,7 @@ os.makedirs(save_dir, exist_ok=True)
 print(f"本次訓練結果將儲存至: {save_dir}")
 
 # ======== Train ========
-num_epochs = 500
+num_epochs = 100
 train_losses, val_losses = [], []
 precisions, recalls, f1_scores, maps = [], [], [], []
 
