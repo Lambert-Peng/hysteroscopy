@@ -3,4 +3,7 @@
 processed_images
 hysteroscopy_dataset
 padded_images
-.pt
+*.pt
+TrainTestDataset
+*.png
+*.pth

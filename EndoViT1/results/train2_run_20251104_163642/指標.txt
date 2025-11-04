@@ -1,0 +1,7 @@
+Accuracy: 0.827
+Precision: 0.918
+Recall(Sensitivity): 0.823
+Specificity: 0.838
+F1-score: 0.868
+AUC: 0.103
+mAP@50: 0.941
