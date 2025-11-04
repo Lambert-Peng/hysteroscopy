@@ -1,0 +1,1 @@
+影像作aug後一起丟到EndoViT提取，然後分成train test但額外複製的全丟到train
