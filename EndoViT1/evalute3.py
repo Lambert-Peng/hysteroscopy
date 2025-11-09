@@ -1,121 +1,186 @@
 import os
-import pandas as pd
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import (
-    confusion_matrix, ConfusionMatrixDisplay,
-    precision_score, recall_score, f1_score,
-    roc_curve, auc, precision_recall_curve,
-    average_precision_score, matthews_corrcoef,
-    brier_score_loss
+    roc_curve, auc, precision_recall_curve, average_precision_score,
+    confusion_matrix, precision_score, recall_score, f1_score,
+    accuracy_score, ConfusionMatrixDisplay
 )
-from sklearn.preprocessing import label_binarize
+import matplotlib.ticker as mtick
 
-# ======== 設定路徑 ========
-excel_path = "results/train3_run_20251104_171501/val_predictions.xlsx"  # 改成實際路徑
+# ======== 設定 ========
+excel_path = "results/train3_run_20251110_004139/val_predictions.xlsx"
 save_dir = os.path.dirname(excel_path)
-df = pd.read_excel(excel_path)
+os.makedirs(save_dir, exist_ok=True)
+target_specificity = 0.9
 
 # ======== 讀取資料 ========
-y_true = df["true_label"].to_numpy()
-y_pred = df["pred_label"].to_numpy()
+df = pd.read_excel(excel_path)
+if "true_label" not in df.columns:
+    raise KeyError("找不到欄位 'true_label'，請確認 Excel 檔案格式。")
+prob_cols = [c for c in df.columns if c.startswith("prob_class")]
+if len(prob_cols) == 0:
+    raise KeyError("找不到任何 prob_class 欄位 (prob_class0, prob_class1, ...)")
 
-# 自動偵測類別
-classes = sorted(df["true_label"].unique())
-num_classes = len(classes)
-print(f"Detected classes: {classes}")
+# 處理 true_label 非數值情況
+orig_labels = df["true_label"].unique()
+if df["true_label"].dtype.kind in 'iufc':
+    y_true = df["true_label"].to_numpy()
+    class_map = {i: i for i in np.unique(y_true)}
+else:
+    class_map = {v: i for i, v in enumerate(sorted(orig_labels))}
+    print("true_label 非數值，已做 mapping：", class_map)
+    y_true = df["true_label"].map(class_map).to_numpy()
 
-# 取出機率
-probs_cols = [f"prob_class{i}" for i in range(num_classes)]
-y_score = df[probs_cols].to_numpy()
+probs = df[prob_cols].to_numpy()
+num_classes = probs.shape[1]
+class_names = [f"Class_{i}" for i in range(num_classes)]
 
-# ======== 混淆矩陣 ========
-cm = confusion_matrix(y_true, y_pred, labels=classes)
-ConfusionMatrixDisplay(cm, display_labels=[f"Class {c}" for c in classes]).plot(cmap="Blues", values_format="d")
+print(f"\n讀取 {len(df)} 筆樣本，共 {num_classes} 類別")
+
+# ======== 整體多分類指標 (pred by argmax prob) ========
+pred_labels = np.argmax(probs, axis=1)
+acc = accuracy_score(y_true, pred_labels)
+macro_prec = precision_score(y_true, pred_labels, average="macro", zero_division=0)
+macro_rec = recall_score(y_true, pred_labels, average="macro", zero_division=0)
+macro_f1 = f1_score(y_true, pred_labels, average="macro", zero_division=0)
+
+print("\n===== 一般多分類模型評估 =====")
+print(f"Accuracy        : {acc:.4f}")
+print(f"Macro Precision : {macro_prec:.4f}")
+print(f"Macro Recall    : {macro_rec:.4f}")
+print(f"Macro F1-score  : {macro_f1:.4f}")
+
+summary_metrics = {
+    "Accuracy": acc,
+    "Macro Precision": macro_prec,
+    "Macro Recall": macro_rec,
+    "Macro F1-score": macro_f1
+}
+pd.DataFrame(list(summary_metrics.items()), columns=["Metric", "Value"]).to_excel(
+    os.path.join(save_dir, "evaluation_summary.xlsx"), index=False
+)
+
+# ======== 混淆矩陣 (Count / Percentage) ========
+cm = confusion_matrix(y_true, pred_labels)
+
+ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names).plot(
+    cmap="Blues", values_format="d"
+)
 plt.title("Confusion Matrix (Count)")
-plt.savefig(os.path.join(save_dir, "confusion_matrix_eval.png"), dpi=300)
+plt.savefig(os.path.join(save_dir, "confusion_matrix_count.png"), dpi=300)
 plt.close()
 
-cm_normalized = cm.astype("float") / cm.sum(axis=1, keepdims=True)
-ConfusionMatrixDisplay(cm_normalized, display_labels=[f"Class {c}" for c in classes]).plot(cmap="Oranges", values_format=".2f")
-plt.title("Confusion Matrix (Percentage)")
+cm_norm = cm.astype(float) / cm.sum(axis=1, keepdims=True)
+ConfusionMatrixDisplay(confusion_matrix=cm_norm, display_labels=class_names).plot(
+    cmap="Oranges", values_format=".2f"
+)
+plt.title("Confusion Matrix (Row Normalized)")
 plt.savefig(os.path.join(save_dir, "confusion_matrix_percent.png"), dpi=300)
 plt.close()
-# ======== 各種指標 ========
-metrics = {}
 
-# Accuracy
-metrics["Accuracy"] = np.mean(y_pred == y_true)
-
-# Precision / Recall / F1
-metrics["Precision (Macro)"] = precision_score(y_true, y_pred, average="macro", zero_division=0)
-metrics["Recall (Macro)"] = recall_score(y_true, y_pred, average="macro", zero_division=0)
-metrics["F1-score (Macro)"] = f1_score(y_true, y_pred, average="macro", zero_division=0)
-
-metrics["Precision (Micro)"] = precision_score(y_true, y_pred, average="micro", zero_division=0)
-metrics["Recall (Micro)"] = recall_score(y_true, y_pred, average="micro", zero_division=0)
-metrics["F1-score (Micro)"] = f1_score(y_true, y_pred, average="micro", zero_division=0)
-
-# MCC
-metrics["MCC"] = matthews_corrcoef(y_true, y_pred)
-
-# Balanced Accuracy
-recall_per_class = recall_score(y_true, y_pred, average=None, labels=classes, zero_division=0)
-# Specificity per class
-specificity_per_class = []
-for i, c in enumerate(classes):
-    tp = ((y_pred == c) & (y_true == c)).sum()
-    fn = ((y_pred != c) & (y_true == c)).sum()
-    tn = ((y_pred != c) & (y_true != c)).sum()
-    fp = ((y_pred == c) & (y_true != c)).sum()
-    specificity = tn / (tn + fp) if (tn + fp) != 0 else 0
-    specificity_per_class.append(specificity)
-metrics["Balanced Accuracy (Macro)"] = np.mean(recall_per_class + np.array(specificity_per_class)) / 2
-
-# Youden Index
-youden_per_class = recall_per_class + np.array(specificity_per_class) - 1
-metrics["Youden Index (Macro)"] = np.mean(youden_per_class)
-
-# Brier Score per class
-brier_per_class = []
-y_true_binarized = label_binarize(y_true, classes=classes)
-for i in range(num_classes):
-    brier_per_class.append(brier_score_loss(y_true_binarized[:, i], y_score[:, i]))
-metrics["Brier Score (Mean)"] = np.mean(brier_per_class)
-
-# ROC & PR curves (One-vs-Rest)
+# ======== per-class ROC & PR (One-vs-Rest) ========
 plt.figure(figsize=(8,6))
-for i, c in enumerate(classes):
-    fpr, tpr, _ = roc_curve(y_true_binarized[:, i], y_score[:, i])
+for i in range(num_classes):
+    y_bin = (y_true == i).astype(int)
+    fpr, tpr, _ = roc_curve(y_bin, probs[:, i])
     roc_auc = auc(fpr, tpr)
-    plt.plot(fpr, tpr, label=f"Class {c} (AUC={roc_auc:.3f})")
-plt.plot([0,1],[0,1],'k--')
+    plt.plot(fpr, tpr, label=f"{class_names[i]} (AUC={roc_auc:.3f})")
+plt.plot([0,1],[0,1],"k--", linewidth=0.8)
 plt.xlabel("False Positive Rate")
 plt.ylabel("True Positive Rate")
-plt.title("ROC Curve (One-vs-Rest)")
-plt.legend()
+plt.title("ROC Curve (per-class, One-vs-Rest)")
+plt.legend(fontsize="small", loc="lower right")
 plt.grid(True)
-plt.savefig(os.path.join(save_dir, "ROC_curve_eval.png"), dpi=300)
+plt.savefig(os.path.join(save_dir, "ROC_per_class.png"), dpi=300)
 plt.close()
 
 plt.figure(figsize=(8,6))
-for i, c in enumerate(classes):
-    p, r, _ = precision_recall_curve(y_true_binarized[:, i], y_score[:, i])
-    ap = average_precision_score(y_true_binarized[:, i], y_score[:, i])
-    plt.plot(r, p, label=f"Class {c} (AP={ap:.3f})")
+for i in range(num_classes):
+    y_bin = (y_true == i).astype(int)
+    precision_vals, recall_vals, _ = precision_recall_curve(y_bin, probs[:, i])
+    ap = average_precision_score(y_bin, probs[:, i])
+    plt.plot(recall_vals, precision_vals, label=f"{class_names[i]} (AP={ap:.3f})")
 plt.xlabel("Recall")
 plt.ylabel("Precision")
-plt.title("Precision-Recall Curve (One-vs-Rest)")
-plt.legend()
+plt.title("Precision–Recall Curve (per-class, One-vs-Rest)")
+plt.legend(fontsize="small", loc="upper right")
 plt.grid(True)
-plt.savefig(os.path.join(save_dir, "PR_curve_eval.png"), dpi=300)
+plt.savefig(os.path.join(save_dir, "PR_per_class.png"), dpi=300)
 plt.close()
 
-# ======== 匯出結果到 Excel ========
-summary_path = os.path.join(save_dir, "evaluation_summary.xlsx")
-pd.DataFrame(list(metrics.items()), columns=["Metric", "Value"]).to_excel(summary_path, index=False)
+# ======== 固定 specificity = 0.9: 對每類別計算 threshold 與指標 ========
+results = []
+for i in range(num_classes):
+    y_bin = (y_true == i).astype(int)
+    scores = probs[:, i]
+    fpr, tpr, thresholds = roc_curve(y_bin, scores)
+    specificity = 1 - fpr
+    idx = np.argmin(np.abs(specificity - target_specificity))
+    thr = thresholds[idx]
+    y_pred_thr = (scores >= thr).astype(int)
+    cm_thr = confusion_matrix(y_bin, y_pred_thr)
+    if cm_thr.size == 4:
+        tn, fp, fn, tp = cm_thr.ravel()
+    else:
+        tn = fp = fn = tp = 0
+    spec = tn / (tn + fp) if (tn + fp) != 0 else 0
+    sens = tp / (tp + fn) if (tp + fn) != 0 else 0
+    prec = precision_score(y_bin, y_pred_thr, zero_division=0)
+    f1s = f1_score(y_bin, y_pred_thr, zero_division=0)
+    acc_c = accuracy_score(y_bin, y_pred_thr)
+    ap = average_precision_score(y_bin, scores)
+    results.append({
+        "class_name": class_names[i],
+        "threshold": thr,
+        "specificity": spec,
+        "sensitivity": sens,
+        "precision": prec,
+        "f1": f1s,
+        "accuracy": acc_c,
+        "AP": ap,
+        "tn": tn, "fp": fp, "fn": fn, "tp": tp
+    })
 
-print("\n===== 模型評估結果 =====")
-for k, v in metrics.items():
-    print(f"{k:30s}: {v:.4f}")
-print(f"\n✅ 評估結果已儲存至：{summary_path}")
+# 匯出 Excel
+pd.DataFrame(results).to_excel(
+    os.path.join(save_dir, f"specificity_eval_{target_specificity}.xlsx"), index=False
+)
+
+# ======== 柱狀圖 (Sensitivity, Precision, F1, Accuracy) ========
+metrics_names = ["sensitivity", "precision", "f1", "accuracy"]
+plt.figure(figsize=(10,6))
+bar_width = 0.2
+x = np.arange(num_classes)
+for idx_m, metric in enumerate(metrics_names):
+    values = [r[metric] for r in results]
+    bars = plt.bar(x + idx_m*bar_width, values, width=bar_width, label=metric.capitalize())
+    if idx_m == 0:
+        for j, bar in enumerate(bars):
+            plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.02,
+                     f"{results[j]['threshold']:.2f}", ha='center', va='bottom', fontsize=9)
+plt.xticks(x + bar_width*(len(metrics_names)-1)/2, [r["class_name"] for r in results])
+plt.ylim(0,1)
+plt.ylabel("Score")
+plt.title(f"Metrics at Specificity ≈ {target_specificity}")
+plt.legend()
+plt.grid(axis="y", linestyle="--", alpha=0.6)
+plt.gca().yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2f'))
+plt.savefig(os.path.join(save_dir, f"specificity_metrics_{target_specificity}.png"), dpi=300)
+plt.close()
+
+# ======== 結果印出 ========
+print(f"\n===== Specificity ≈ {target_specificity} 各類別結果 =====")
+for r in results:
+    print(f"\nClass {r['class_name']}:")
+    print(f"  Threshold   : {r['threshold']:.3f}")
+    print(f"  Specificity : {r['specificity']:.3f}")
+    print(f"  Sensitivity : {r['sensitivity']:.3f}")
+    print(f"  Precision   : {r['precision']:.3f}")
+    print(f"  F1-score    : {r['f1']:.3f}")
+    print(f"  Accuracy    : {r['accuracy']:.3f}")
+    print(f"  AP          : {r['AP']:.3f}")
+    print(f"  Confusion Matrix (tn, fp, fn, tp): ({r['tn']}, {r['fp']}, {r['fn']}, {r['tp']})")
+
+print(f"\n所有圖表與結果已輸出至：{save_dir}")

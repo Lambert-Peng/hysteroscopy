@@ -1,0 +1,7 @@
+.jpg
+.pt
+all_dataset
+dataset_split
+
+results/
+**/results/**
