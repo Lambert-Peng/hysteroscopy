@@ -73,13 +73,20 @@ save_dir = f"results/train3_run_{timestamp}"
 os.makedirs(save_dir, exist_ok=True)
 print(f"本次訓練結果將儲存至: {save_dir}")
 
-# ======== Train Loop ========
+# ======== Early Stopping 設定 ========
 num_epochs = 300
+patience = 100  # 若連續 100 個 epoch 未改善則提前停止
+best_val_loss = float("inf")
+no_improve_epochs = 0
+best_model_path = os.path.join(save_dir, "best_model.pt")
+
 train_losses, val_losses, train_accs, val_accs = [], [], [], []
 
+# ======== Train Loop ========
 for epoch in range(num_epochs):
     model.train()
     total_loss, correct, total = 0, 0, 0
+
     for x, y, _ in tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}"):
         x, y = x.to(device), y.to(device)
         optimizer.zero_grad()
@@ -90,6 +97,7 @@ for epoch in range(num_epochs):
         total_loss += loss.item() * x.size(0)
         correct += (out.argmax(1) == y).sum().item()
         total += y.size(0)
+
     train_losses.append(total_loss / len(train_loader.dataset))
     train_accs.append(correct / total)
 
@@ -97,6 +105,7 @@ for epoch in range(num_epochs):
     model.eval()
     preds, trues, logits_list, fnames = [], [], [], []
     val_total_loss, correct, total = 0, 0, 0
+
     with torch.no_grad():
         for x, y, names in val_loader:
             x, y = x.to(device), y.to(device)
@@ -111,15 +120,30 @@ for epoch in range(num_epochs):
             logits_list.append(torch.softmax(logits, dim=1).cpu().numpy())
             fnames.extend(names)
 
-    val_losses.append(val_total_loss / len(val_loader.dataset))
-    val_accs.append(correct / total)
+    val_loss = val_total_loss / len(val_loader.dataset)
+    val_acc = correct / total
+    val_losses.append(val_loss)
+    val_accs.append(val_acc)
 
-    print(f"Epoch {epoch+1:03d} | TrainLoss={train_losses[-1]:.4f} | ValLoss={val_losses[-1]:.4f} | "
-          f"TrainAcc={train_accs[-1]:.3f} | ValAcc={val_accs[-1]:.3f}")
+    print(f"Epoch {epoch+1:03d} | TrainLoss={train_losses[-1]:.4f} | ValLoss={val_loss:.4f} | "
+          f"TrainAcc={train_accs[-1]:.3f} | ValAcc={val_acc:.3f}")
 
-# ===== Save Model =====
-model_path = os.path.join(save_dir, "mlp_classifier.pt")
-torch.save(model.state_dict(), model_path)
+    # ===== Early Stopping 檢查 =====
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        no_improve_epochs = 0
+        torch.save(model.state_dict(), best_model_path)
+        print(f"Val loss 改善，已儲存最佳模型至 {best_model_path}")
+    else:
+        no_improve_epochs += 1
+
+    if no_improve_epochs >= patience:
+        print(f"早停觸發：連續 {patience} 個 epoch 無改善，結束訓練。")
+        break
+
+# ===== 使用最佳模型 =====
+model.load_state_dict(torch.load(best_model_path))
+print(f"\n已載入最佳模型 (ValLoss={best_val_loss:.4f})")
 
 # ===== Save Validation Results for Evaluation =====
 logits_all = np.concatenate(logits_list, axis=0)
@@ -135,20 +159,26 @@ df = pd.DataFrame({
 excel_path = os.path.join(save_dir, "val_predictions.xlsx")
 df.to_excel(excel_path, index=False)
 
-epochs = np.arange(1, num_epochs + 1)
-# Loss 曲線 (Train vs Val)
-plt.figure(figsize=(8, 6))
-plt.plot(epochs, train_losses, label="Train Loss")
-plt.plot(epochs, val_losses, label="Val Loss")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.title("Train vs Val Loss Curve")
-plt.grid(True)
-plt.legend()
-plt.savefig(os.path.join(save_dir, "train_val_loss_curve.png"), dpi=300)
-plt.close()
+# ===== Save Curves =====
+epochs = np.arange(1, len(train_losses) + 1)
+def plot_loss(train_losses, val_losses, optimizer):
+    # 從 optimizer 取得 learning rate
+    learning_rate = optimizer.param_groups[0]['lr']
+    
+    plt.figure(figsize=(8, 5))
+    plt.plot(train_losses, label='Train Loss')
+    plt.plot(val_losses, label='Val Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title(f'Learning Rate: {learning_rate:.6f} - Training and Validation Loss')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_dir, "loss_curve.png"), dpi=300)
+    plt.close()
 
-# Accuracy 曲線 
+plot_loss(train_losses, val_losses, optimizer)
+
 plt.figure(figsize=(8, 6))
 plt.plot(epochs, train_accs, label="Train Accuracy")
 plt.plot(epochs, val_accs, label="Val Accuracy")
@@ -160,5 +190,4 @@ plt.legend()
 plt.savefig(os.path.join(save_dir, "accuracy_curve.png"), dpi=300)
 plt.close()
 
-
-print(f"\n模型與預測資料已儲存：\nModel: {model_path}\nData: {excel_path}")
+print(f"\n模型與預測資料已儲存：\n最佳模型: {best_model_path}\n驗證結果: {excel_path}")

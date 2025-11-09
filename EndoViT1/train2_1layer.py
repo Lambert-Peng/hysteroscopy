@@ -37,20 +37,13 @@ class FeatureDataset(Dataset):
 
 # ======== Model ========
 class MLPClassifier(nn.Module):
-    def __init__(self, in_dim=768, hidden1=256, hidden2=64, num_classes=2):
+    def __init__(self, in_dim=768, num_classes=2):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(in_dim, hidden1),
-            nn.BatchNorm1d(hidden1),
-            nn.ReLU(),
-            nn.Linear(hidden1, hidden2),
-            nn.BatchNorm1d(hidden2),
-            nn.ReLU(),
-            nn.Linear(hidden2, num_classes)
-        )
+        self.linear = nn.Linear(in_dim, num_classes)
+        
 
     def forward(self, x):
-        return self.net(x)
+         return self.linear(x)
 
 
 # ======== Config ========
@@ -62,18 +55,18 @@ train_loader = DataLoader(FeatureDataset(train_dir), batch_size=32, shuffle=True
 val_loader = DataLoader(FeatureDataset(val_dir), batch_size=32, shuffle=False)
 
 model = MLPClassifier().to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=2e-5)
+optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
 class_weights = torch.tensor([1.0, 1.0], dtype=torch.float).to(device)
 
 # ======== Save Dir ========
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-save_dir = f"results/train2_run_{timestamp}"
+save_dir = f"results/train2_1layer_run_{timestamp}"
 os.makedirs(save_dir, exist_ok=True)
 print(f"本次訓練結果將儲存至: {save_dir}")
 
 # ======== Train Loop ========
-num_epochs = 300
-patience = 100  # 若連續100個epoch沒有改善就提前停止
+num_epochs = 800
+patience = 50  # 若連續50個epoch沒有改善就提前停止
 best_val_loss = float("inf")
 no_improve_epochs = 0
 best_model_path = os.path.join(save_dir, "best_model.pt")
@@ -133,7 +126,6 @@ for epoch in range(num_epochs):
         no_improve_epochs += 1
 
     if no_improve_epochs >= patience:
-        print(f"早停觸發：連續 {patience} 個 epoch 無改善。停止訓練。")
         break
 
 # ===== 使用最佳模型 =====
