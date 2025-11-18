@@ -10,7 +10,7 @@ from sklearn.metrics import (
 import matplotlib.ticker as mtick
 
 # ======== 設定 ========
-excel_path = "results/best/train3_run_20251110_000827/val_predictions.xlsx"
+excel_path = "results/train3_1layer_MIL_run_20251116_165711/val_predictions.xlsx"
 save_dir = os.path.dirname(excel_path)
 os.makedirs(save_dir, exist_ok=True)
 target_specificity = 0.9
@@ -183,4 +183,53 @@ for r in results:
     print(f"  AP          : {r['AP']:.3f}")
     print(f"  Confusion Matrix (tn, fp, fn, tp): ({r['tn']}, {r['fp']}, {r['fn']}, {r['tp']})")
 
-print(f"\n所有圖表與結果已輸出至：{save_dir}")
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class AttentionMIL(nn.Module):
+    def __init__(self, in_dim=768, num_classes=2, hidden_dim=256):
+        super().__init__()
+        self.attention = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, 1)
+        )
+        self.classifier = nn.Linear(in_dim, num_classes)
+
+    def forward(self, x):
+        A = self.attention(x)             # (N, 1)
+        A = torch.softmax(A, dim=0)       # normalize over instances
+        bag_feat = torch.sum(A * x, dim=0)   # (768)
+        logits = self.classifier(bag_feat.unsqueeze(0))
+        return logits, A.squeeze(-1)
+
+# ============================================================
+# ======== NEW: Outlier Analysis (Top uncertain bags) ========
+# ============================================================
+outlier_dir = os.path.join(save_dir, "outliers")
+os.makedirs(outlier_dir, exist_ok=True)
+
+df["uncertainty"] = (df["prob_class1"] - 0.5).abs()
+df_out = df.sort_values("uncertainty").head(20)   # 取最不確定的 20 個
+
+df_out.to_excel(os.path.join(outlier_dir, "outlier_bags.xlsx"), index=False)
+print(f"Outlier bags 已輸出至: {outlier_dir}")
+
+# ============================================================
+# ======== NEW: Per-bag Confusion Matrix Report ============
+# ============================================================
+bag_report = pd.DataFrame({
+    "bag": df["bag"],
+    "true": df["true_label"],
+    "pred": df["pred_label"],
+    "correct?": (df["true_label"] == df["pred_label"])
+})
+
+report_path = os.path.join(save_dir, "bag_level_report.xlsx")
+bag_report.to_excel(report_path, index=False)
+
+print(f"Bag-level confusion matrix 已輸出至: {report_path}")
+
+print(f"\n所有檔案輸出於：{save_dir}")

@@ -26,12 +26,12 @@ def prepare_augmented_dataset(input_dir="test_images", output_dir="all_images", 
     image_paths = sorted(input_path.glob("*.png")) + sorted(input_path.glob("*.jpg"))
 
     if len(image_paths) == 0:
-        raise FileNotFoundError("❌ 沒有找到圖片，請確認資料夾是否正確且包含 .png 或 .jpg 檔案！")
+        raise FileNotFoundError("沒有找到圖片，請確認資料夾是否正確且包含 .png 或 .jpg 檔案！")
 
     is_train = "train" in input_dir.lower()
     is_val = "val" in input_dir.lower()
 
-    print(f"📁 資料夾: {input_dir}")
+    print(f"資料夾: {input_dir}")
     if is_train:
         print("模式: 訓練集 (進行 resize 與資料增強)")
     elif is_val:
@@ -83,7 +83,7 @@ def prepare_augmented_dataset(input_dir="test_images", output_dir="all_images", 
             name, ext = os.path.splitext(p.name)
             aug_resized.save(Path(output_dir) / f"{name}_aug{ext}")
 
-    print("✅ 資料準備完成！")
+    print("資料準備完成！")
     return is_train  # 回傳是否為 train 模式，以便主程式決定是否繼續後續處理
 
 
@@ -143,7 +143,7 @@ if __name__ == "__main__":
         image_paths = sorted(image_folder.glob("*.png")) + sorted(image_folder.glob("*.jpg"))
 
         if len(image_paths) == 0:
-            raise FileNotFoundError("❌ Output 資料夾沒有任何圖片，請檢查 prepare_augmented_dataset 是否成功。")
+            raise FileNotFoundError("Output 資料夾沒有任何圖片，請檢查 prepare_augmented_dataset 是否成功。")
 
         images_list = []
         for p in tqdm(image_paths, desc="處理圖片", position=0):
@@ -170,10 +170,10 @@ if __name__ == "__main__":
 
         # 存檔
         torch.save(features.cpu(), "features.pt")
-        print("💾 特徵已存成 features.pt")
+        print("特徵已存成 features.pt")
 
     except KeyboardInterrupt:
-        print("\n🟥 偵測到 Ctrl+C，中斷程式...")
+        print("\n偵測到 Ctrl+C，中斷程式...")
 
     end_time = time.time()
-    print(f"⏱️ 總執行時間: {end_time - start_time:.1f} 秒")
+    print(f"總執行時間: {end_time - start_time:.1f} 秒")

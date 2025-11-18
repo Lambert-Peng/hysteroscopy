@@ -7,3 +7,6 @@ padded_images
 TrainTestDataset
 *.png
 *.pth
+dataset
+results
+sorteddata
