@@ -1,0 +1,23 @@
+MIL/aug3/dataset_spilt
+
+train   A 190   aug*4  760
+	B 921 	       921
+	C 212	       848
+
+val     A 61
+	B 232
+	C 56
+
+val
+bag數量
+
+A 12
+B 70
+C 14
+
+
+
+train2_1layer   一層
+train2		多層
+train2_mean	一層mean pooling
+train2m 	多層且meanpooling

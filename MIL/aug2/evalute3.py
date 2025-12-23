@@ -10,7 +10,7 @@ from sklearn.metrics import (
 import matplotlib.ticker as mtick
 
 # ======== 設定 ========
-excel_path = "results/train3_1layer_MIL_run_20251116_165711/val_predictions.xlsx"
+excel_path = "results/train3_1layer_MIL_run_20251203_003541/val_predictions.xlsx"
 save_dir = os.path.dirname(excel_path)
 os.makedirs(save_dir, exist_ok=True)
 target_specificity = 0.9

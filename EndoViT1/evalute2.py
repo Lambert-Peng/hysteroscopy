@@ -9,7 +9,7 @@ from sklearn.metrics import (
 )
 
 # ======== 設定 ========
-excel_path = "results/best/train2_run_20251109_172647/val_predictions.xlsx"
+excel_path = "results/train2_1layer_run_20251203_015602/val_predictions.xlsx"
 save_dir = os.path.dirname(excel_path)
 os.makedirs(save_dir, exist_ok=True)
 target_specificity = 0.9

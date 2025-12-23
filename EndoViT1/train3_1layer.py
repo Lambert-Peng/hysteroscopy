@@ -48,16 +48,16 @@ class MLPClassifier(nn.Module):
          return self.linear(x)
 
 # ======== Config ========
-train_dir = "1101/data/train/weights"
-val_dir = "1101/data/val/weights"
+train_dir = "MILnewdata/train/weights"
+val_dir = "MILnewdata/val/weights"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 train_loader = DataLoader(FeatureDataset(train_dir), batch_size=32, shuffle=True)
 val_loader = DataLoader(FeatureDataset(val_dir), batch_size=32, shuffle=False)
 
 model = MLPClassifier().to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-class_weights = torch.tensor([2.0, 1.0, 2.0], dtype=torch.float).to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
+class_weights = torch.tensor([3.0, 1.0, 3.0], dtype=torch.float).to(device)
 
 # ======== Save Dir ========
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")

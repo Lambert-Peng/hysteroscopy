@@ -47,8 +47,8 @@ class MLPClassifier(nn.Module):
 
 
 # ======== Config ========
-train_dir = "1101/data/train/weights"
-val_dir = "1101/data/val/weights"
+train_dir = "MILnewdata/train/weights"
+val_dir = "MILnewdata/val/weights"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 train_loader = DataLoader(FeatureDataset(train_dir), batch_size=32, shuffle=True)
@@ -56,7 +56,7 @@ val_loader = DataLoader(FeatureDataset(val_dir), batch_size=32, shuffle=False)
 
 model = MLPClassifier().to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
-class_weights = torch.tensor([1.0, 1.0], dtype=torch.float).to(device)
+class_weights = torch.tensor([1.5, 1.0], dtype=torch.float).to(device)
 
 # ======== Save Dir ========
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -66,7 +66,7 @@ print(f"本次訓練結果將儲存至: {save_dir}")
 
 # ======== Train Loop ========
 num_epochs = 800
-patience = 50  # 若連續50個epoch沒有改善就提前停止
+patience = 100 
 best_val_loss = float("inf")
 no_improve_epochs = 0
 best_model_path = os.path.join(save_dir, "best_model.pt")

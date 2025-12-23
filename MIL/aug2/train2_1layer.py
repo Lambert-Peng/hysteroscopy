@@ -87,7 +87,7 @@ train_loader = DataLoader(MILDataset(train_dir), batch_size=1, shuffle=True)
 val_loader   = DataLoader(MILDataset(val_dir), batch_size=1, shuffle=False)
 
 model = AttentionMIL().to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
 class_weights = torch.tensor([1.0, 1.0], dtype=torch.float).to(device)
 
 # ==========================
@@ -102,7 +102,7 @@ print(f"訓練結果儲存於：{save_dir}")
 #     Training Loop
 # ==========================
 num_epochs = 800
-patience = 100
+patience = 50
 best_val_loss = float("inf")
 no_improve_epochs = 0
 best_model_path = os.path.join(save_dir, "best_model.pt")

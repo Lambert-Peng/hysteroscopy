@@ -90,8 +90,8 @@ train_loader = DataLoader(MILDataset(train_dir), batch_size=1, shuffle=True)
 val_loader   = DataLoader(MILDataset(val_dir), batch_size=1, shuffle=False)
 
 model = AttentionMIL().to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-class_weights = torch.tensor([2.0, 1.0, 2.0], dtype=torch.float).to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+class_weights = torch.tensor([1.0, 1.0, 1.0], dtype=torch.float).to(device)
 
 # ==========================
 #        Save Dir
@@ -105,7 +105,7 @@ print(f"本次訓練結果將儲存至: {save_dir}")
 #    Early Stopping
 # ==========================
 num_epochs = 800
-patience = 100
+patience = 50
 best_val_loss = float("inf")
 no_improve_epochs = 0
 best_model_path = os.path.join(save_dir, "best_model.pt")
